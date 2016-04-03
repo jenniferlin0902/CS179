@@ -22,6 +22,7 @@ void cudaBlurKernel(const float *raw_data, const float *blur_v, float *out_data,
     uint thread_index = blockIdx.x * blockDim.x* threadIdx.x;
     int j = 0;
     if (thread_index < n_frames) {
+        printf("thread index = %d\n",thread_index);
         while(j < blur_v_size) {
             out_data[thread_index] = raw_data[blur_v_size + thread_index - j]\
 			 * blur_v[j];
