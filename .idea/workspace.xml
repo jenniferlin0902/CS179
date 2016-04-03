@@ -43,20 +43,20 @@
               </provider>
             </entry>
           </file>
-          <file leaf-file-name="blur_device.cu" pinned="false" current-in-tab="false">
+          <file leaf-file-name="blur_device.cu" pinned="false" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/lab1/blur_device.cu">
               <provider selected="true" editor-type-id="text-editor">
-                <state vertical-scroll-proportion="-11.703704">
-                  <caret line="34" column="23" selection-start-line="34" selection-start-column="22" selection-end-line="34" selection-end-column="23" />
+                <state vertical-scroll-proportion="0.8111511">
+                  <caret line="41" column="21" selection-start-line="41" selection-start-column="21" selection-end-line="41" selection-end-column="21" />
                   <folding />
                 </state>
               </provider>
             </entry>
           </file>
-          <file leaf-file-name="blur_host.cpp" pinned="false" current-in-tab="true">
+          <file leaf-file-name="blur_host.cpp" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/lab1/blur_host.cpp">
               <provider selected="true" editor-type-id="text-editor">
-                <state vertical-scroll-proportion="0.41366908">
+                <state vertical-scroll-proportion="-8.518518">
                   <caret line="235" column="49" selection-start-line="235" selection-start-column="45" selection-end-line="235" selection-end-column="49" />
                   <folding>
                     <element signature="e#1206#1428#0" expanded="true" />
@@ -94,8 +94,8 @@
         <option value="$PROJECT_DIR$/blur_host.cpp" />
         <option value="$PROJECT_DIR$/blur_device.cu" />
         <option value="$PROJECT_DIR$/CMakeLists.txt" />
-        <option value="$PROJECT_DIR$/lab1/blur_device.cu" />
         <option value="$PROJECT_DIR$/lab1/blur_host.cpp" />
+        <option value="$PROJECT_DIR$/lab1/blur_device.cu" />
       </list>
     </option>
   </component>
@@ -222,11 +222,17 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/lab1/blur_device.cu">
+    <entry file="file://$PROJECT_DIR$/lab1/blur_host.cpp">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="-11.703704">
-          <caret line="34" column="23" selection-start-line="34" selection-start-column="22" selection-end-line="34" selection-end-column="23" />
-          <folding />
+        <state vertical-scroll-proportion="-8.518518">
+          <caret line="235" column="49" selection-start-line="235" selection-start-column="45" selection-end-line="235" selection-end-column="49" />
+          <folding>
+            <element signature="e#1206#1428#0" expanded="true" />
+            <element signature="e#2952#3752#0" expanded="true" />
+            <element signature="e#8838#8964#0" expanded="true" />
+            <element signature="e#9925#10040#0" expanded="true" />
+            <element signature="e#10376#10683#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -238,17 +244,11 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/lab1/blur_host.cpp">
+    <entry file="file://$PROJECT_DIR$/lab1/blur_device.cu">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.41366908">
-          <caret line="235" column="49" selection-start-line="235" selection-start-column="45" selection-end-line="235" selection-end-column="49" />
-          <folding>
-            <element signature="e#1206#1428#0" expanded="true" />
-            <element signature="e#2952#3752#0" expanded="true" />
-            <element signature="e#8838#8964#0" expanded="true" />
-            <element signature="e#9925#10040#0" expanded="true" />
-            <element signature="e#10376#10683#0" expanded="true" />
-          </folding>
+        <state vertical-scroll-proportion="0.8111511">
+          <caret line="41" column="21" selection-start-line="41" selection-start-column="21" selection-end-line="41" selection-end-column="21" />
+          <folding />
         </state>
       </provider>
     </entry>
