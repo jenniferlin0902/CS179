@@ -247,7 +247,8 @@ int large_gauss_test(int argc, char **argv) {
         // TODO: Copy this channel's input data (stored in input_data) from host
         // memory to the GPU
         cudaMemcpy(dev_input_data + GAUSSIAN_SIZE, input_data, sizeof(float)*n_frames, cudaMemcpyHostToDevice);
-        // NOTE: This is a function in the blur_device.cu file, where you'll fill
+        cudaMemset(dev_input_data, 0x0, sizeof(float)*GAUSSIAN_SIZE);
+	// NOTE: This is a function in the blur_device.cu file, where you'll fill
         // in the kernel call
         cudaCallBlurKernel(blocks, local_size, dev_input_data, dev_blur_v,
             dev_out_data, n_frames, GAUSSIAN_SIZE);

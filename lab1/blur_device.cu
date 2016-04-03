@@ -23,7 +23,8 @@ void cudaBlurKernel(const float *raw_data, const float *blur_v, float *out_data,
     int j = 0;
     if (thread_index < n_frames) {
         while(j < blur_v_size) {
-            out_data[thread_index] = raw_data[thread_index - j] * blur_v[j];
+            out_data[thread_index] = raw_data[blur_v_size + thread_index - j]\
+			 * blur_v[j];
             j++;
         }
     }
@@ -39,7 +40,6 @@ void cudaCallBlurKernel(const unsigned int blocks,
         const unsigned int blur_v_size) {
         
     memset(out_data,0x0, n_frames* sizeof(float));
-    memset(raw_data,0x0, blur_v_size* sizeof(float));
     cudaBlurKernel<<<blocks, threadsPerBlock>>>(raw_data,blur_v, out_data,\
     n_frames, blur_v_size);
 }
