@@ -153,7 +153,7 @@ int large_gauss_test(int argc, char **argv) {
     int n_frames = 1e7;
 #endif
 
-
+    printf("here1\n");
     // Per-channel input data
     float *input_data = (float *) malloc(sizeof (float) * n_frames);
 
@@ -169,8 +169,9 @@ int large_gauss_test(int argc, char **argv) {
     // TODO: Allocate memory on the GPU here. Note that the audio data comes in
     // as floating-point values, the number of which is stored in N.
     float *dev_input_data;
-    cudaMalloc((void**) &dev_input_data, sizeof(float) * n_frames);
 
+    cudaMalloc((void**) &dev_input_data, sizeof(float) * n_frames);
+    printf("here2\n");
     // We have to store our impulse response on the GPU as well. (Fun fact:
     // Later in the class, we'll see that we can store small, often-used
     // quantities in special GPU memory regions. But for now, global memory will
