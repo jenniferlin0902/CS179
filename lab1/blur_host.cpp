@@ -186,7 +186,7 @@ int large_gauss_test(int argc, char **argv) {
     cudaMemcpy(dev_blur_v, (const void*)blur_v, sizeof(float) * GAUSSIAN_SIZE, cudaMemcpyHostToDevice);
 
     float *dev_out_data;
-    cudaMalloc((void**) &dev_blur_v, sizeof(float) * n_frames);
+    cudaMalloc((void**) &dev_out_data, sizeof(float) * n_frames);
 
 
     // Iterate through each audio channel (e.g. 2 iterations for  stereo files)
