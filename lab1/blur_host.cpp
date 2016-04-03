@@ -153,7 +153,6 @@ int large_gauss_test(int argc, char **argv) {
     int n_frames = 1e7;
 #endif
 
-    printf("here1\n");
     // Per-channel input data
     float *input_data = (float *) malloc(sizeof (float) * n_frames);
 
@@ -170,8 +169,7 @@ int large_gauss_test(int argc, char **argv) {
     // as floating-point values, the number of which is stored in N.
     float *dev_input_data;
 
-    cudaMalloc((void**) &dev_input_data, sizeof(float) * n_frames);
-    printf("here2\n");
+    cudaMalloc((void**) &dev_input_data, sizeof(float) * (n_frames + GAUSSIAN_SIZE));
     // We have to store our impulse response on the GPU as well. (Fun fact:
     // Later in the class, we'll see that we can store small, often-used
     // quantities in special GPU memory regions. But for now, global memory will
@@ -248,7 +246,7 @@ int large_gauss_test(int argc, char **argv) {
 
         // TODO: Copy this channel's input data (stored in input_data) from host
         // memory to the GPU
-        cudaMemcpy(dev_input_data, input_data, sizeof(float)*n_frames, cudaMemcpyHostToDevice);
+        cudaMemcpy(dev_input_data + GAUSSIAN_SIZE, input_data, sizeof(float)*n_frames, cudaMemcpyHostToDevice);
         // NOTE: This is a function in the blur_device.cu file, where you'll fill
         // in the kernel call
         cudaCallBlurKernel(blocks, local_size, dev_input_data, dev_blur_v,
