@@ -87,10 +87,11 @@ int large_gauss_test(int argc, char **argv) {
     int GAUSSIAN_SIDE_WIDTH = 10;
     int GAUSSIAN_SIZE = 2 * GAUSSIAN_SIDE_WIDTH + 1;
 
+
     // Space for both sides of the gaussian blur vector, plus the middle,
     // gives this size requirement
     float *blur_v = (float *) malloc(sizeof (float) * GAUSSIAN_SIZE );
-
+    cudaSetDevice(2);
     // Fill it from the middle out
     for (int i = -GAUSSIAN_SIDE_WIDTH; i <= GAUSSIAN_SIDE_WIDTH; i++)
         blur_v[ GAUSSIAN_SIDE_WIDTH + i ] = gaussian(i, mean, std);
@@ -150,7 +151,7 @@ int large_gauss_test(int argc, char **argv) {
     // Can set as the number of trials
     int n_channels = 1;
     // Can set how many data points arbitrarily
-    int n_frames = 1e7;
+    int n_frames = 100000;
 #endif
 
     // Per-channel input data
@@ -246,8 +247,13 @@ int large_gauss_test(int argc, char **argv) {
 
         // TODO: Copy this channel's input data (stored in input_data) from host
         // memory to the GPU
-        cudaMemcpy(dev_input_data + GAUSSIAN_SIZE, input_data, sizeof(float)*n_frames, cudaMemcpyHostToDevice);
-        cudaMemset(dev_input_data, 0x0, sizeof(float)*GAUSSIAN_SIZE);
+	cudaMemset(dev_input_data, 0x0, sizeof(float)*GAUSSIAN_SIZE);
+	/*for (int i = 0; i < n_frames; i++){
+		printf("input[i]=%f\n",input_data[i]); 
+	}*/
+        cudaMemcpy(dev_input_data + GAUSSIAN_SIZE, input_data,\
+			 sizeof(float)*n_frames, cudaMemcpyHostToDevice);
+	cudaMemset(dev_out_data, 0x0, sizeof(float)*n_frames);
 	// NOTE: This is a function in the blur_device.cu file, where you'll fill
         // in the kernel call
         cudaCallBlurKernel(blocks, local_size, dev_input_data, dev_blur_v,

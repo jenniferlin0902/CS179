@@ -19,14 +19,14 @@ void cudaBlurKernel(const float *raw_data, const float *blur_v, float *out_data,
     //
     // It may be helpful to use the information in the lecture slides, as well
     // as the CPU implementation, as a reference.
-    uint thread_index = blockIdx.x * blockDim.x* threadIdx.x;
+    uint thread_index = blockIdx.x * blockDim.x* blockDim.y + \
+			threadIdx.y * blockDim.x + threadIdx.x;
     int j = 0;
     if (thread_index < n_frames) {
-        printf("thread index = %d\n",thread_index);
         while(j < blur_v_size) {
-            out_data[thread_index] = raw_data[blur_v_size + thread_index - j]\
+	    out_data[thread_index] += raw_data[blur_v_size + thread_index - j]\
 			 * blur_v[j];
-            j++;
+	   j++;
         }
     }
 }
@@ -39,8 +39,7 @@ void cudaCallBlurKernel(const unsigned int blocks,
         float *out_data,
         const unsigned int n_frames,
         const unsigned int blur_v_size) {
-        
-    memset(out_data,0x0, n_frames* sizeof(float));
-    cudaBlurKernel<<<blocks, threadsPerBlock>>>(raw_data,blur_v, out_data,\
+    	int i;
+	cudaBlurKernel<<<blocks, threadsPerBlock>>>(raw_data,blur_v, out_data,\
     n_frames, blur_v_size);
 }
