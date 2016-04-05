@@ -84,7 +84,8 @@ int large_gauss_test(int argc, char **argv) {
     float mean = 0.0;
     float std = 5.0;
 
-    int GAUSSIAN_SIDE_WIDTH = 10;
+    //int GAUSSIAN_SIDE_WIDTH = 10;
+    int GAUSSIAN_SIDE_WIDTH = 32;
     int GAUSSIAN_SIZE = 2 * GAUSSIAN_SIDE_WIDTH + 1;
 
 
@@ -151,7 +152,7 @@ int large_gauss_test(int argc, char **argv) {
     // Can set as the number of trials
     int n_channels = 1;
     // Can set how many data points arbitrarily
-    int n_frames = 100000;
+    int n_frames = 10000000;
 #endif
 
     // Per-channel input data
@@ -248,9 +249,6 @@ int large_gauss_test(int argc, char **argv) {
         // TODO: Copy this channel's input data (stored in input_data) from host
         // memory to the GPU
 	cudaMemset(dev_input_data, 0x0, sizeof(float)*GAUSSIAN_SIZE);
-	/*for (int i = 0; i < n_frames; i++){
-		printf("input[i]=%f\n",input_data[i]); 
-	}*/
         cudaMemcpy(dev_input_data + GAUSSIAN_SIZE, input_data,\
 			 sizeof(float)*n_frames, cudaMemcpyHostToDevice);
 	cudaMemset(dev_out_data, 0x0, sizeof(float)*n_frames);
@@ -292,7 +290,8 @@ int large_gauss_test(int argc, char **argv) {
                 success = false;
                 cerr << "Incorrect output at index " << i << ": " <<
                     output_data_host[i] << ", "  << output_data[i] << endl;
-            }
+           	break;
+		 }
         }
 
         if (success)
