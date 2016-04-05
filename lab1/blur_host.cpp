@@ -290,7 +290,6 @@ int large_gauss_test(int argc, char **argv) {
                 success = false;
                 cerr << "Incorrect output at index " << i << ": " <<
                     output_data_host[i] << ", "  << output_data[i] << endl;
-           	break;
 		 }
         }
 

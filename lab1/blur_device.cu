@@ -1,7 +1,7 @@
 /* 
  * CUDA blur
  * Kevin Yuh, 2014 
- * Revised by Nailen Matschke, 2016
+ * Revised by Jennifer Chih Wen Lin 2016
  */
 
 #include <cstdio>
