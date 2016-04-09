@@ -52,7 +52,7 @@ void shmemTransposeKernel(const float *input, float *output, int n) {
     // memory bank conflicts (0 bank conflicts should be possible using
     // padding). Again, comment on all sub-optimal accesses.
 
-    __shared__ float data[(4*32) * 32];
+    __shared__ float data[(64*32) * 16];
 
     const int i = threadIdx.x + 64 * blockIdx.x;
     int j = 4 * threadIdx.y + 64 * blockIdx.y;
