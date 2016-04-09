@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
     // if you are using a shared computer. You may ignore or remove these 
     // functions if you are running on your local machine.
     TA_Utilities::select_coldest_GPU();
-    int max_time_allowed_in_seconds = 10;
+    int max_time_allowed_in_seconds = 1000;
     TA_Utilities::enforce_time_limit(max_time_allowed_in_seconds);
     
     // Seed random number generator
