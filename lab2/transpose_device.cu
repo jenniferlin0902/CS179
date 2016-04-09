@@ -1,7 +1,7 @@
 #include <cassert>
 #include <cuda_runtime.h>
 #include "transpose_device.cuh"
-
+#include <cstdio>
 /*
  * TODO for all kernels (including naive):
  * Leave a comment above all non-coalesced memory accesses and bank conflicts.
@@ -40,7 +40,7 @@ void naiveTransposeKernel(const float *input, float *output, int n) {
     const int i = threadIdx.x + 64 * blockIdx.x;
     int j = 4 * threadIdx.y + 64 * blockIdx.y;
     const int end_j = j + 4;
-
+//    printf("thread idx.x = %d, thread_idx.y = %d\n", threadIdx.x, threadIdx.y);
     for (; j < end_j; j++)
         output[j + n * i] = input[i + n * j];
 }

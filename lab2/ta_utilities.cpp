@@ -88,6 +88,7 @@ namespace TA_Utilities
   /* Create a child thread that will kill the parent thread after the
      specified time limit has been exceeded */
   void enforce_time_limit(int time_limit) {
+
       printf("Time limit for this program set to %d seconds\n", time_limit);
       int parent_id = getpid();
       pid_t child_id = fork();
