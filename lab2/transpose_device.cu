@@ -103,6 +103,7 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
     //int x = threadIdx.x + y;
     int y = threadIdx.y * 4;
     int x = threadIdx.x + y;
+    const int end_j = j+4;
     for (; j < end_j; j++) {
         data[ x + y * ( 64 * 2)] = input[i + n * j];
         y++;
@@ -113,7 +114,7 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
 
     //y = threadIdx.x;
     //x = threadIdx.y * 4 + y;
-    base = threadIdx.x*128 + threadIdx.y*4 + threadIdx.x;
+    int base = threadIdx.x*128 + threadIdx.y*4 + threadIdx.x;
     int i1 = threadIdx.x + 64 * blockIdx.y;
     int j1 = 4 *threadIdx.y + 64 * blockIdx.x;
 
