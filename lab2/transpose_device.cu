@@ -96,6 +96,8 @@ void shmemTransposeKernel(const float *input, float *output, int n) {
 __global__
 void optimalTransposeKernel(const float *input, float *output, int n) {    __shared__ float data[64*64*2];
 
+    __shared__ float data[64*64*2];
+    
     const int i = threadIdx.x + 64 * blockIdx.x;
     int j = 4 *threadIdx.y + 64 * blockIdx.y;
    // const int end_j = j + 4;
@@ -104,9 +106,9 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
     int base = threadIdx.x + threadIdx.y* 512;
 
     data[ base ] = input[i + n * (j)];
-    data[ base + 129] = input[i + n * (j+ 1)];
-    data[ base + 258] = input[i + n * (j + 2)];
-    data[ base + 387] = input[i + n * (j + 3)];
+    data[ base + 129] = input[i + n * (j+1)];
+    data[ base + 258] = input[i + n * (j+2)];
+    data[ base + 387] = input[i + n * (j+3)];
 
     __syncthreads();
 
@@ -117,7 +119,7 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
     int j1 = 4 *threadIdx.y + 64 * blockIdx.x;
 
     output[i1 + n * (j1)] = data[base];
-    output[i1 + n * (j1+1)] = data[base + 1 ];
+    output[i1 + n * (j1+1)] = data[base + 1];
     output[i1 + n * (j1+2)] = data[base + 2];
     output[i1 + n * (j1+3)] = data[base + 3];
 
