@@ -41,24 +41,30 @@ void naiveTransposeKernel(const float *input, float *output, int n) {
     const int i = threadIdx.x + 64 * blockIdx.x;
     int j = 4 * threadIdx.y + 64 * blockIdx.y;
     const int end_j = j + 4;
-//    printf("thread idx.x = %d, thread_idx.y = %d\n", threadIdx.x, threadIdx.y);
     for (; j < end_j; j++)
         output[j + n * i] = input[i + n * j];
+    /* Reading from input is coalesced, but writing to output, each thread
+     * is accessing from different row at the same time. Thus, the
+     * write is not coalesced. Each loop will touch 128 cache line.
+     * */
+
 }
 
 __global__
 void shmemTransposeKernel(const float *input, float *output, int n) {
     // TODO: Modify transpose kernel to use shared memory. All global memory
-    // reads and writes should be coalesced. Minimize the number of shared
-    // memory bank conflicts (0 bank conflicts should be possible using
-    // padding). Again, comment on all sub-optimal accesses.
+
 
     __shared__ float data[64*64*2];
 
     const int i = threadIdx.x + 64 * blockIdx.x;
     int j = 4 *threadIdx.y + 64 * blockIdx.y;
     const int end_j = j + 4;
-
+    /* First, read in to shared memory. All read are coaleaced, since each thread
+     * are accessing from the same row */
+    /* Note that input is stored in shared memory data[] in a shifted manner.
+     * This is for avoiding bank conflict when writing to output. During each
+     * loop, the thread in warp will write to the subsequent bank */
     int y = threadIdx.y * 4;
     int x = threadIdx.x + y;
     for (; j < end_j; j++) {
@@ -68,7 +74,14 @@ void shmemTransposeKernel(const float *input, float *output, int n) {
     }
 
     __syncthreads();
-    j = 4 * threadIdx.y + 64 * blockIdx.y;
+    /*
+     * Read each thread read from shared memory. For each thread, it will write
+     * to a column to output[], so globla meory acess is coalesced.
+     * Note that each thread should read from a row in
+     * shared memory. Since the data is stored shifted. For example, data [0,0]
+     * is bank 0 and data [0,1] is in bank 1, so there is no bank conflict; thread
+     * 0 and thread 1 is accessing different bank.
+     */
     y = threadIdx.x;
     x = threadIdx.y * 4 + y;
     int i1 = threadIdx.x + 64 * blockIdx.y;
