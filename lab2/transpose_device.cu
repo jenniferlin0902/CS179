@@ -74,7 +74,6 @@ void shmemTransposeKernel(const float *input, float *output, int n) {
     for (; j < end_j; j++){
         output[i + n * j] = data[ x + y * (64 * 2)];
         x++;
-        y++;
     }
 }
 
