@@ -20,7 +20,8 @@
  * a 32x4 section.
  *
  * If we split the 64x64 matrix into 32 blocks of shape (32, 4), then we have
- * a block matrix of shape (2 blocks, 16 blocks).
+ * a block matrix of shape (2 blocks, 16
+ * blocks).
  * Warp 0 handles block (0, 0), warp 1 handles (1, 0), warp 2 handles (0, 1),
  * warp n handles (n % 2, n / 2).
  *
@@ -52,25 +53,26 @@ void shmemTransposeKernel(const float *input, float *output, int n) {
     // memory bank conflicts (0 bank conflicts should be possible using
     // padding). Again, comment on all sub-optimal accesses.
 
-    __shared__ float data[(64*32) * 16];
+    __shared__ float data[64*64*2];
 
     const int i = threadIdx.x + 64 * blockIdx.x;
-    int j = 4 * threadIdx.y + 64 * blockIdx.y;
-    int warp_index_x = threadIdx.x/32;
+    int j = 4 *threadIdx.y + 64 * blockIdx.y;
     const int end_j = j + 4;
 
     for (; j < end_j; j++) {
-        int x = (j - blockIdx.y * 64) * 32 + threadIdx.x%32;
-        int y = warp_index_x*32 + threadIdx.x%32;
-        data[ x + y * (32 * 64)] = input[i + n * j];
+        int y = j - blockIdx.y * 64;
+        int x = threadIdx.x + y;
+        data[ x + y * (64*2)] = input[i + n * j];
     }
+
     __syncthreads();
+
     j-=4;
     int k = 0;
     for (; j < end_j; j++){
-        int y = (threadIdx.x % 32 + threadIdx.y * 4 + k);
-        int x = threadIdx.x;
-        output[i + n * j] = data[ x + y * (32*64)];
+        int y = threadIdx.x;
+        int x = j - blockIdx.y * 64 + threadIdx.x;
+        output[i + n * j] = data[ x + y * (64 * 2)];
         k++;
     }
 }
