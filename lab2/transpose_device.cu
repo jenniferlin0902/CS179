@@ -98,7 +98,6 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
 
     const int i = threadIdx.x + 64 * blockIdx.x;
     int j = 4 *threadIdx.y + 64 * blockIdx.y;
-    const int end_j = j + 4;
     int y = threadIdx.y * 4;
     int x = threadIdx.x + y;
 
@@ -113,14 +112,14 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
     x = threadIdx.y * 4 + y;
     int i1 = threadIdx.x + 64 * blockIdx.y;
     int j1 = 4 *threadIdx.y + 64 * blockIdx.x;
-    int end_j1 = j1 + 4;
 
-    /*
+    float temp[4];
+    memcpy((void*)temp, (void*)(&data + x + y*(128)),sizeof(float)*4);
+	 
     output[i1 + n * (j1)] = data[ x + y * (64 * 2)];
     output[i1 + n * (j1+1)] = data[ x + 1 +y * (64 * 2)];
     output[i1 + n * (j1+2)] = data[ x + 2 +y * (64 * 2)];
-    output[i1 + n * (j1+3)] = data[ x + 3 +y * (64 * 2)];*/
-    memcpy((void*)output[i1 + n*j1],(void*)data[x+y * (64*2)],sizeof(float)*4);
+    output[i1 + n * (j1+3)] = data[ x + 3 +y * (64 * 2)];
 
 }
 
