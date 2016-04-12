@@ -42,7 +42,7 @@ Question 1.4
 a) No. On lhs, thre is no bank conflict since for each thread, it will access a column, whre each column is located in a different bank. For rhs,
 there is also no bank conflict. Since within a warp, j are identical, 
 so all threads always access the same element. 
-b
+
 
 b) 
 line1 : 
@@ -71,3 +71,16 @@ output[i + 32*j] += lhs[i + 32 * k] * rhs[k + 128 * j] + hs[i + 32 * (k + 1)] * 
 
 
 e) 
+Aside from the minimizing the instruction dependency, we can unwind some loop in each thread. 
+Currently, each thread goes through 64 loop, where each loop it performs two product sums. We can unwind some loop to speed up the process. 
+For example, 
+
+for (int k = 0; k < 128; k += 4) {
+    output[i + 32 * j] += lhs[i + 32 * k] * rhs[k + 128 * j];
+    output[i + 32 * j] += lhs[i + 32 * (k + 1)] * rhs[(k + 1) + 128 * j];
+    output[i + 32 * j] += lhs[i + 32 * (k + 2)] * rhs[(k + 2) + 128 * j];
+    output[i + 32 * j] += lhs[i + 32 * (k + 3)] * rhs[(k + 3) + 128 * j];
+
+}
+
+And in each loop we should repeat step d, to minimize the instruction dependencies. 

@@ -98,22 +98,18 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
     
     const int i = threadIdx.x + (blockIdx.x << 6);
     int j = (threadIdx.y << 2) + (blockIdx.y << 6);
-   // const int end_j = j + 4;
-    //int y = threadIdx.y * 4;
-    //int x = threadIdx.x + y;
-   /* int y = threadIdx.y * 4;
-    int x = threadIdx.x + y;
-    const int end_j = j+4;
-    for (; j < end_j; j++) {
-        data[ x + y * ( 64 * 2)] = input[i + n * j];
-        y++;
-        x++;
-    }*/
+    float temp1, temp2, temp3, temp4;
     int base = threadIdx.x + threadIdx.y * 516;
-    data[base] = input[i + n*(j)];
-    data[base + 129] = input[i + n*(j+1)];
-    data[base + 258] = input[i + n*(j+2)];
-    data[base + 387] = input[i + n*(j+3)];
+
+    temp1 = input[i + n*(j)];
+    temp2 = input[i + n*(j+1)];
+    temp3 = input[i + n*(j+2)];
+    temp4 = input[i + n*(j+3)];
+
+    data[base] = temp1;
+    data[base + 129] = temp2;
+    data[base + 258] = temp3;
+    data[base + 387] = temp4;
 
     __syncthreads();
 
@@ -123,10 +119,15 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
     int i1 = threadIdx.x + (blockIdx.y << 6);
     int j1 = (threadIdx.y << 2) + (blockIdx.x << 6);
 
-    output[i1 + n * (j1)] = data[base];
-    output[i1 + n * (j1+1)] = data[base + 1];
-    output[i1 + n * (j1+2)] = data[base + 2];
-    output[i1 + n * (j1+3)] = data[base + 3];
+    temp1 = data[base];
+    temp2 = data[base + 1];
+    temp3 = data[base + 2];
+    temp4 = data[base + 3];
+
+    output[i1 + n * (j1)] = temp1;
+    output[i1 + n * (j1+1)] = temp2;
+    output[i1 + n * (j1+2)] = temp3;
+    output[i1 + n * (j1+3)] = temp4;
 
 }
 
