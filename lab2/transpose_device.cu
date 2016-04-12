@@ -94,8 +94,7 @@ void shmemTransposeKernel(const float *input, float *output, int n) {
 }
 
 __global__
-void optimalTransposeKernel(const float *input, float *output, int n) {
-    __shared__ float data[64*64*2];
+void optimalTransposeKernel(const float *input, float *output, int n) {    __shared__ float data[64*64*2];
     /*
     const int i = threadIdx.x + (blockIdx.x << 6);
     int j = (threadIdx.y << 2) + (blockIdx.y << 6);
@@ -132,20 +131,39 @@ void optimalTransposeKernel(const float *input, float *output, int n) {
 */
 
     const int i = threadIdx.x + 64 * blockIdx.x;
-    int j = threadIdx.y + 64 * blockIdx.y;
-    printf("threadIdx.y = %d", threadIdx.y);
-    //const int end_j = j + 4;
-
-    int y = threadIdx.y;
+    int j = threadIdx.y*2 + 64 * blockIdx.y;
+    const int end_j = j + 2;
+    /* First, read in to shared memory. All read are coaleaced, since each thread
+     * are accessing from the same row */
+    /* Note that input is stored in shared memory data[] in a shifted manner.
+     * This is for avoiding bank conflict when writing to output. During each
+     * loop, the thread in warp will write to the subsequent bank */
+    int y = threadIdx.y * 4;
     int x = threadIdx.x + y;
-    data[ x + y * ( 64 * 2)] = input[i + n * j];
-    __syncthreads();
+    for (; j < end_j; j++) {
+        data[ x + y * ( 64 * 2)] = input[i + n * j];
+        y++;
+        x++;
+    }
 
+    __syncthreads();
+    /*
+     * Read each thread read from shared memory. For each thread, it will write
+     * to a column to output[], so globla meory acess is coalesced.
+     * Note that each thread should read from a row in
+     * shared memory. Since the data is stored shifted. For example, data [0,0]
+     * is bank 0 and data [0,1] is in bank 1, so there is no bank conflict; thread
+     * 0 and thread 1 is accessing different bank.
+     */
     y = threadIdx.x;
-    x = threadIdx.y + y;
+    x = threadIdx.y * 2 + y;
     int i1 = threadIdx.x + 64 * blockIdx.y;
-    int j1 = threadIdx.y + 64 * blockIdx.x;
-    output[i1 + n * j1] = data[ x + y * (64 * 2)];
+    int j1 = 2 *threadIdx.y + 64 * blockIdx.x;
+    int end_j1 = j1 + 2;
+    for (; j1 < end_j1; j1++){
+        output[i1 + n * j1] = data[ x + y * (64 * 2)];
+        x++;
+    }
 }
 
 void cudaTranspose(
@@ -165,7 +183,7 @@ void cudaTranspose(
         shmemTransposeKernel<<<gridSize, blockSize>>>(d_input, d_output, n);
     }
     else if (type == OPTIMAL) {
-        dim3 blockSize(64, 64);
+        dim3 blockSize(64, 32);
         dim3 gridSize(n / 64, n / 64);
         optimalTransposeKernel<<<gridSize, blockSize>>>(d_input, d_output, n);
     }
