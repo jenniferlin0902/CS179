@@ -138,7 +138,7 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
     /* Note that input is stored in shared memory data[] in a shifted manner.
      * This is for avoiding bank conflict when writing to output. During each
      * loop, the thread in warp will write to the subsequent bank */
-    int y = threadIdx.y * 4;
+    int y = threadIdx.y * 2;
     int x = threadIdx.x + y;
     for (; j < end_j; j++) {
         data[ x + y * ( 64 * 2)] = input[i + n * j];
