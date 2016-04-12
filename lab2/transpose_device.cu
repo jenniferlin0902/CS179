@@ -38,9 +38,9 @@ __global__
 void naiveTransposeKernel(const float *input, float *output, int n) {
     // TODO: do not modify code, just comment on suboptimal accesses
 
-    const int i = threadIdx.x + 64 * blockIdx.x;
-    int j = 2 * threadIdx.y + 64 * blockIdx.y;
-    const int end_j = j + 2;
+    const int i = threadIdx.x + 32 * blockIdx.x;
+    int j = 1 * threadIdx.y + 32 * blockIdx.y;
+    const int end_j = j + 1;
     for (; j < end_j; j++)
         output[j + n * i] = input[i + n * j];
     /* Reading from input is coalesced, but writing to output, each thread
@@ -173,8 +173,8 @@ void cudaTranspose(
     TransposeImplementation type)
 {
     if (type == NAIVE) {
-        dim3 blockSize(64, 32);
-        dim3 gridSize(n / 64, n / 64);
+        dim3 blockSize(32, 32);
+        dim3 gridSize(n / 32, n / 32);
         naiveTransposeKernel<<<gridSize, blockSize>>>(d_input, d_output, n);
     }
     else if (type == SHMEM) {
