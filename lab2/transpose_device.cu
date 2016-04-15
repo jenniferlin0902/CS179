@@ -2,16 +2,6 @@
 #include <cuda_runtime.h>
 #include "transpose_device.cuh"
 #include <cstdio>
-/*
- * TODO for all kernels (including naive):
- * Leave a comment above all non-coalesced memory accesses and bank conflicts.
- * Make it clear if the suboptimal access is a read or write. If an access is
- * non-coalesced, specify how many cache lines it touches, and if an access
- * causes bank conflicts, say if its a 2-way bank conflict, 4-way bank
- * conflict, etc.
- *
- * Comment all of your kernels.
- */
 
 
 /*
@@ -34,6 +24,13 @@
  * it would take a 4194304 x 4194304    matrix, which would take ~17.6TB of
  * memory (well beyond what I expect GPUs to have in the next few years).
  */
+
+
+/* Reading from input is coalesced, but writing to output, each thread
+ * is accessing from different row at the same time. Thus, the
+ * write is not coalesced. Each loop will touch 32 cache line.
+ * */
+
 __global__
 void naiveTransposeKernel(const float *input, float *output, int n) {
     // TODO: do not modify code, just comment on suboptimal accesses
@@ -43,10 +40,7 @@ void naiveTransposeKernel(const float *input, float *output, int n) {
     const int end_j = j + 1;
     for (; j < end_j; j++)
         output[j + n * i] = input[i + n * j];
-    /* Reading from input is coalesced, but writing to output, each thread
-     * is accessing from different row at the same time. Thus, the
-     * write is not coalesced. Each loop will touch 32 cache line.
-     * */
+
 
 }
 
@@ -56,11 +50,12 @@ void naiveTransposeKernel(const float *input, float *output, int n) {
 /* First, read in to shared memory. All read are coaleaced, since each thread
  * are accessing from the same row */
 /* Note that input is stored in shared memory data[] in a shifted manner.
+ * That is, data [0,0] in bank 0, data [0,1] in bank 1, data[i,j] in bank (j%32).
  * This is for avoiding bank conflict when writing to output. During each
  * loop, the thread in warp will write to the subsequent bank */
 /*
  * Read each thread read from shared memory. For each thread, it will write
- * to a column to output[], so globla meory acess is coalesced.
+ * to a column to output[], so global memory access is coalesced.
  * Note that each thread should read from a row in
  * shared memory. Since the data is stored shifted. For example, data [0,0]
  * is bank 0 and data [0,1] is in bank 1, so there is no bank conflict; thread
@@ -69,8 +64,6 @@ void naiveTransposeKernel(const float *input, float *output, int n) {
 
 __global__
 void shmemTransposeKernel(const float *input, float *output, int n) {
-    // TODO: Modify transpose kernel to use shared memory. All global memory
-
 
     __shared__ float data[64*64*2];
 
@@ -100,11 +93,13 @@ void shmemTransposeKernel(const float *input, float *output, int n) {
 }
 
 
-/* unwind the for loop to use four read instead.
+/* The optimalTransposeKernel is build on shmemTranspose, so all
+ * global memory is coalesced and no bank conflict. It applies
+ * loop unwinding, ILP, and minimize duplicate arithmatic.
  * */
-
 __global__
-void optimalTransposeKernel(const float *input, float *output, int n) {    __shared__ float data[64*64*2];
+void optimalTransposeKernel(const float *input, float *output, int n) {
+    __shared__ float data[64*64*2];
 
     const int i = threadIdx.x + (blockIdx.x << 6);
     int j = (threadIdx.y << 2) + (blockIdx.y << 6);
@@ -125,8 +120,6 @@ void optimalTransposeKernel(const float *input, float *output, int n) {    __sha
     output[i1 + n * (j1+1)] = data[base + 1];
     output[i1 + n * (j1+2)] = data[base + 2];
     output[i1 + n * (j1+3)] = data[base + 3];
-
-
 }
 
 void cudaTranspose(

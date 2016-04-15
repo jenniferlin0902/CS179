@@ -1,5 +1,7 @@
 CS179 
+Jennifer, Chih Wen, Lin 
 
+Part I 
 Question 1.1 
 An arithmetic instrction on a GPU take around 10 ns and the clock is around 1GHz. In GTK110, each SM contains 4 warp scheduler with dual 
 instruction dispatch unix. Thus, to hide the latency, we need to initiate
@@ -30,7 +32,7 @@ each thread will require a cache load. Total cache line hit per warp
 is 32. 
 
 c) 
-This write is coalesced, however, each warp will try to access data 
+This write is not coalesced, each warp will try to access data 
 from data[32 * n + 1] to data [32 *n + 33]. Note that data[32*n] to 
 data[32*n + 31] will be loaded into the same cache, while accessing 
 data[32*n + 33] will require an extra cache load. Thus, the 
@@ -84,3 +86,46 @@ for (int k = 0; k < 128; k += 4) {
 }
 
 And in each loop we should repeat step d, to minimize the instruction dependencies. 
+
+
+
+Part II 
+
+Index of the GPU with the lowest temperature: 1 (55 C)
+Time limit for this program set to 1000 seconds
+Size 512 naive CPU: 0.801184 ms
+Size 512 GPU memcpy: 0.034592 ms
+Size 512 naive GPU: 0.100384 ms
+Size 512 shmem GPU: 0.033792 ms
+Size 512 optimal GPU: 0.030560 ms
+
+Size 1024 naive CPU: 3.858112 ms
+Size 1024 GPU memcpy: 0.086944 ms
+Size 1024 naive GPU: 0.295520 ms
+Size 1024 shmem GPU: 0.095808 ms
+Size 1024 optimal GPU: 0.088512 ms
+
+Size 2048 naive CPU: 37.389599 ms
+Size 2048 GPU memcpy: 0.266656 ms
+Size 2048 naive GPU: 1.151872 ms
+Size 2048 shmem GPU: 0.320704 ms
+Size 2048 optimal GPU: 0.306272 ms
+
+Size 4096 naive CPU: 155.413116 ms
+Size 4096 GPU memcpy: 1.004832 ms
+Size 4096 naive GPU: 4.116608 ms
+Size 4096 shmem GPU: 1.257120 ms
+Size 4096 optimal GPU: 1.187328 ms
+
+
+BONUS 
+The 2 calls is worse the vec_add. 
+1. 
+For the 2-call, we need 4 memory loading and 2 memory writing per loop in the calculation. 
+For the three eleement vec_add, we need 3 memory loading and 1 memory writing per loop. Thus, the later is more efficient. 
+
+2. 
+In addition, the vec_add(a, z, a, n) is not parallelizable. since output z denpends on input a. 
+
+
+
