@@ -413,7 +413,7 @@ int large_gauss_test(int argc, char **argv){
         (See Lecture 9 for details on padding.)
         Set the rest of the memory regions to 0 (recommend using cudaMemset).
         */
-        cudaMemSet((void*)(dev_input_data + input_length), 0x0, sizeof(cufftComplex)*(padded_length - input_length));
+        cudaMemSet((void*)(dev_input_data + N), 0x0, sizeof(cufftComplex)*(padded_length - N));
         cudaMemSet((void*)(dev_impulse_v + impulse_length), 0x0, sizeof(cufftComplex)*(padded_length - impulse_length));
 
 
