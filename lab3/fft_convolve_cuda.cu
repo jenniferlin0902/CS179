@@ -26,7 +26,7 @@ __device__ static float atomicMax(float* address, float val)
     do {
         assumed = old;
         old = ::atomicCAS(address_as_i, assumed,
-            __float_as_int(::fmaxf(val, __int_as_float(assumed))));
+                          __float_as_int(::fmaxf(val, __int_as_float(assumed))));
     } while (assumed != old);
     return __int_as_float(old);
 }
