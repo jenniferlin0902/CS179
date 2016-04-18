@@ -2,7 +2,7 @@
  * Kevin Yuh, 2014 */
 
 #include <cstdio>
-#include <math.h>
+#include <cmath>
 #include <cuda_runtime.h>
 #include <cufft.h>
 
