@@ -25,17 +25,17 @@ __device__ static float atomicMax(float* address, float val)
     int old = *address_as_i, assumed;
     do {
         assumed = old;
-        old = ::atomicCAS(address_as_i, assumed,
-            __float_as_int(::fmaxf(val, __int_as_float(assumed))));
+        old = atomicCAS(address_as_i, assumed,
+            __float_as_int(fmaxf(val, __int_as_float(assumed))));
     } while (assumed != old);
     return __int_as_float(old);
 }
 
-__device__ static float atomicComplexMax(cufftComplex* address, cufftComplex val)
+__device__ static void atomicComplexMax(cufftComplex* address, cufftComplex val)
 {
     float mag1 = (address->x)*(address->x) + (address->y)*(address->y);
     float mag2 = (val.x)*(val.x) + (val.y)*(val.y);
-    return atomicMax(&mag1, mag2);
+    atomicMax(&mag1, mag2);
 }
 
 
@@ -71,12 +71,12 @@ cudaProdScaleKernel(const cufftComplex *raw_data, const cufftComplex *impulse_v,
 }
 
 __device__ void warpMax(volatile float* sdata, int tid){
-    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 32]);
-    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 16]);
-    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 8]);
-    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 4]);
-    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 2]);
-    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 1]);
+    atomicMax((float*)&sdata[tid], sdata[tid + 32]);
+    atomicMax((float*)&sdata[tid], sdata[tid + 16]);
+    atomicMax((float*)&sdata[tid], sdata[tid + 8]);
+    atomicMax((float*)&sdata[tid], sdata[tid + 4]);
+    atomicMax((float*)&sdata[tid], sdata[tid + 2]);
+    atomicMax((float*)&sdata[tid], sdata[tid + 1]);
 }
 
 __global__
@@ -110,13 +110,12 @@ void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
 
     while(threadId < padded_length){
         uint i = blockIdx.x * (blockDim.x * 2)+ threadIdx.x;
-        s_max_data[threadId] = atomicComplexMax(&out_data[i],out_data[i + blockDim.x]);
+        atomicComplexMax(&out_data[i],out_data[i + blockDim.x]);
         __syncthreads();
 
         for(unsigned int s = blockDim.x/2; s > 32; s >>= 1){
             if (threadId < s){
-                s_max_data[threadId] = atomicMax((float *)s_max_data + threadId, \
-                s_max_data[threadId + s]);
+                atomicMax((float *)s_max_data + threadId, s_max_data[threadId + s]);
             }
         }
         if (threadId < 32){
