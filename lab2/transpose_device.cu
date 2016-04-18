@@ -35,9 +35,9 @@ __global__
 void naiveTransposeKernel(const float *input, float *output, int n) {
     // TODO: do not modify code, just comment on suboptimal accesses
 
-    const int i = threadIdx.x + 32 * blockIdx.x;
-    int j = 1 * threadIdx.y + 32 * blockIdx.y;
-    const int end_j = j + 1;
+    const int i = threadIdx.x + 64 * blockIdx.x;
+    int j = 4 * threadIdx.y + 64 * blockIdx.y;
+    const int end_j = j + 4;
     for (; j < end_j; j++)
         output[j + n * i] = input[i + n * j];
 
@@ -98,6 +98,7 @@ void shmemTransposeKernel(const float *input, float *output, int n) {
  * loop unwinding, ILP, and minimize duplicate arithmatic.
  * */
 __global__
+ 
 void optimalTransposeKernel(const float *input, float *output, int n) {
     __shared__ float data[64*64*2];
 
@@ -120,6 +121,7 @@ void optimalTransposeKernel(const float *input, float *output, int n) {
     output[i1 + n * (j1+1)] = data[base + 1];
     output[i1 + n * (j1+2)] = data[base + 2];
     output[i1 + n * (j1+3)] = data[base + 3];
+
 }
 
 void cudaTranspose(
@@ -129,7 +131,7 @@ void cudaTranspose(
     TransposeImplementation type)
 {
     if (type == NAIVE) {
-        dim3 blockSize(16, 16);
+        dim3 blockSize(64, 16);
         dim3 gridSize(n / 64, n / 64);
         naiveTransposeKernel<<<gridSize, blockSize>>>(d_input, d_output, n);
     }
