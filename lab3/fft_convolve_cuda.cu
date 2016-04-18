@@ -71,12 +71,12 @@ cudaProdScaleKernel(const cufftComplex *raw_data, const cufftComplex *impulse_v,
 }
 
 __device__ void warpMax(volatile float* sdata, int tid){
-    sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 32]);
-    sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 16]);
-    sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 8]);
-    sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 4]);
-    sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 2]);
-    sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 1]);
+    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 32]);
+    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 16]);
+    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 8]);
+    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 4]);
+    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 2]);
+    sdata[tid] = atomicMax((float*)&sdata[tid], sdata[tid + 1]);
 }
 
 __global__
@@ -159,7 +159,7 @@ void cudaCallMaximumKernel(const unsigned int blocks,
         cufftComplex *out_data,
         float *max_abs_val,
         const unsigned int padded_length) {
-        cudaMaximumKernel<<blocks, threadsPerBlock, padded_length * sizeof(float)>>>(out_data, max_abs_val, padded_length);
+        cudaMaximumKernel<<<blocks, threadsPerBlock, padded_length * sizeof(float)>>>(out_data, max_abs_val, padded_length);
     /* TODO 2: Call the max-finding kernel. */
 
 }
