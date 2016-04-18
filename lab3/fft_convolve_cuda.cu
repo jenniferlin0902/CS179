@@ -70,14 +70,13 @@ cudaProdScaleKernel(const cufftComplex *raw_data, const cufftComplex *impulse_v,
     }
 }
 
-__device__ cufftComplex warpMax(volatile cufftComplex* sdata, int threadId){
+__device__ void warpMax(volatile float* sdata, int tid){
     sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 32]);
     sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 16]);
     sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 8]);
     sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 4]);
     sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 2]);
     sdata[tid] = atomicMax(&sdata[tid], sdata[tid + 1]);
-
 }
 
 __global__
@@ -111,7 +110,7 @@ void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
 
     while(threadId < padded_length){
         uint i = blockIdx.x * (blockDim.x * 2)+ threadIdx.x;
-        s_max_data[threadId] = atomicComplexMax(&out_data[i],out_data[i + blockDim.x];
+        s_max_data[threadId] = atomicComplexMax(&out_data[i],out_data[i + blockDim.x]);
         __syncthreads();
 
         for(unsigned int s = blockDim.x/2; s > 32; s >>= 1){
@@ -138,9 +137,9 @@ cudaDivideKernel(cufftComplex *out_data, float *max_abs_val,
     uint thread_index = blockIdx.x * blockDim.x + threadIdx.x;
     while (thread_index < padded_length) {
         float max = *max_abs_val;
-        cufftComplex = out_data;
-        out_data[thread_index].x = out_data.x/max;
-        out_data[thread_index].y = out_data.y/max;
+        cufftComplex data = out_data[thread_index];
+        out_data[thread_index].x = data.x/max;
+        out_data[thread_index].y = data.y/max;
         thread_index += blockDim.x * gridDim.x;
     }
 }
@@ -152,7 +151,7 @@ void cudaCallProdScaleKernel(const unsigned int blocks,
         const cufftComplex *impulse_v,
         cufftComplex *out_data,
         const unsigned int padded_length) {
-        cudaProdScaleKernel<<<blocks, threadsPerBloc, padded_length * sizeof(cufftComplex)>>>(raw_data, impulse_v, out_data, padded_length);
+        cudaProdScaleKernel<<<blocks, threadsPerBlock, padded_length * sizeof(cufftComplex)>>>(raw_data, impulse_v, out_data, padded_length);
 }
 
 void cudaCallMaximumKernel(const unsigned int blocks,
@@ -160,7 +159,6 @@ void cudaCallMaximumKernel(const unsigned int blocks,
         cufftComplex *out_data,
         float *max_abs_val,
         const unsigned int padded_length) {
-        
         cudaMaximumKernel<<blocks, threadsPerBlock, padded_length * sizeof(float)>>>(out_data, max_abs_val, padded_length);
     /* TODO 2: Call the max-finding kernel. */
 
