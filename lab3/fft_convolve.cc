@@ -561,7 +561,7 @@ int large_gauss_test(int argc, char **argv){
         cudaMalloc(&dev_max_abs_val, sizeof(float));
 
         /* TODO 2: Set it to 0 in preparation for running. */
-        cudaMemSet(dev_max_abs_val, 0x0, sizeof(float));
+        cudaMemset(dev_max_abs_val, 0x0, sizeof(float));
 
 
 
