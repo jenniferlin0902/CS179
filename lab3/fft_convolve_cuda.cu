@@ -31,13 +31,6 @@ __device__ static float atomicMax(float* address, float val)
     return __int_as_float(old);
 }
 
-__device__ static void atomicComplexMax(cufftComplex* address, cufftComplex val)
-{
-    float mag1 = (address->x)*(address->x) + (address->y)*(address->y);
-    float mag2 = (val.x)*(val.x) + (val.y)*(val.y);
-    atomicMax(&mag1, mag2);
-}
-
 
 __global__
 void
@@ -70,22 +63,21 @@ cudaProdScaleKernel(const cufftComplex *raw_data, const cufftComplex *impulse_v,
     }
 }
 
-__device__ void warpMax(volatile float* sdata, int tid){
-    sdata[tid] = complexCompare(sdata[tid], sdata[tid + 32]);
-    sdata[tid] = complexCompare(sdata[tid], sdata[tid + 16]);
-    sdata[tid] = complexCompare(sdata[tid], sdata[tid + 8]);
-    sdata[tid] = complexCompare(sdata[tid], sdata[tid + 4]);
-    sdata[tid] = complexCompare(sdata[tid], sdata[tid + 2]);
-    sdata[tid] = complexCompare(sdata[tid], sdata[tid + 1]);
-
-}
-
-
 
 __device__ float complexCompare(cufftComplex num1, cufftComplex num2){
-    float mag1 = num1.x*num1.x + num1.y*num1.y;
-    float mag2 = num2.x*num2.x + num2.y*num2.y;
+    float mag1 = abs(num1.x);
+    float mag2 = abs(num2.x);
+    return (mag1 >= mag2) ? mag1 : mag2;
 }
+
+/*
+__device__ void warpMax(volatile float* sdata, int tid){
+
+
+}*/
+
+
+
 
 __global__
 void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
@@ -112,31 +104,43 @@ void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
         29596797/can-the-return-value-of-float-as-int-be-used-to-
         compare-float-in-cuda)
     */
-    /*
-    __shared__ float s_max_data[];
 
-    //extern __shared__ cufftComplex max_data[];
+    extern __shared__ float s_max_data[];
+
     uint threadId = threadIdx.x;
-
-    while(threadId < padded_length){
-        uint i = blockIdx.x * (blockDim.x * 2)+ threadIdx.x;
+    uint i = blockIdx.x * (blockDim.x * 2)+ threadIdx.x;
+    //printf("padded_length = %d\n", padded_length);
+    while((i + blockDim.x) < padded_length){
         s_max_data[threadId] = complexCompare(out_data[i], out_data[i + blockDim.x]);
         __syncthreads();
-
-        for(unsigned int s = blockDim.x/2; s > 32; s >>= 1){
+        //printf("first copy\n");
+        for(unsigned int s = blockDim.x/2; s > 0; s >>= 1){
             if (threadId < s){
-                s_max_data[threadId] = complexCompare(s_max_data[threadId], s_max_data[threadId + s]);
-                __syncthreads();
+                s_max_data[threadId] = (s_max_data[threadId] >= s_max_data[threadId + s])\
+                        ? s_max_data[threadId] : s_max_data[threadId + s];
             }
+            __syncthreads();
         }
         if (threadId < 32){
-            warpMax(s_max_data, threadId);
+            s_max_data[threadId] = (s_max_data[threadId] >= s_max_data[threadId + 32]) \
+                    ? s_max_data[threadId] : s_max_data[threadId + 32];
+            s_max_data[threadId] = (s_max_data[threadId] >= s_max_data[threadId + 16]) \
+                    ? s_max_data[threadId] : s_max_data[threadId + 16];
+            s_max_data[threadId] = (s_max_data[threadId] >= s_max_data[threadId + 8]) \
+                    ? s_max_data[threadId] : s_max_data[threadId + 8];
+            s_max_data[threadId] = (s_max_data[threadId] >= s_max_data[threadId + 4]) \
+                    ? s_max_data[threadId] : s_max_data[threadId + 4];
+            s_max_data[threadId] = (s_max_data[threadId] >= s_max_data[threadId + 2]) \
+                    ? s_max_data[threadId] : s_max_data[threadId + 2];
+            s_max_data[threadId] = (s_max_data[threadId] >= s_max_data[threadId + 1]) \
+                    ? s_max_data[threadId] : s_max_data[threadId + 1];
+
         }
-        if (threadIdx.x == 0){
+        if (threadId == 0){
             atomicMax(max_abs_val, s_max_data[0]);
         }
-        threadId += blockDim.x * gridDim.x;
-    } */
+        i += (blockDim.x * 2) * gridDim.x;
+    }
 }
 
 __global__
@@ -144,11 +148,12 @@ void
 cudaDivideKernel(cufftComplex *out_data, float *max_abs_val,
     int padded_length) {
     uint thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+    float max = *max_abs_val;
     while (thread_index < padded_length) {
-        float max = *max_abs_val;
         cufftComplex data = out_data[thread_index];
-        out_data[thread_index].x = data.x/max;
-        out_data[thread_index].y = data.y/max;
+        data.x = data.x/max;
+        data.y = data.y/max;
+        out_data[thread_index] = data;
         thread_index += blockDim.x * gridDim.x;
     }
 }
@@ -160,7 +165,7 @@ void cudaCallProdScaleKernel(const unsigned int blocks,
         const cufftComplex *impulse_v,
         cufftComplex *out_data,
         const unsigned int padded_length) {
-        cudaProdScaleKernel<<<blocks, threadsPerBlock, padded_length * sizeof(cufftComplex)>>>(raw_data, impulse_v, out_data, padded_length);
+        cudaProdScaleKernel<<<blocks, threadsPerBlock>>>(raw_data, impulse_v, out_data, padded_length);
 }
 
 void cudaCallMaximumKernel(const unsigned int blocks,
@@ -168,7 +173,7 @@ void cudaCallMaximumKernel(const unsigned int blocks,
         cufftComplex *out_data,
         float *max_abs_val,
         const unsigned int padded_length) {
-        cudaMaximumKernel<<<blocks, threadsPerBlock, padded_length * sizeof(float)>>>(out_data, max_abs_val, padded_length);
+        cudaMaximumKernel<<<blocks, threadsPerBlock, sizeof(float)*threadsPerBlock>>>(out_data, max_abs_val, padded_length);
     /* TODO 2: Call the max-finding kernel. */
 
 }
@@ -179,6 +184,6 @@ void cudaCallDivideKernel(const unsigned int blocks,
         cufftComplex *out_data,
         float *max_abs_val,
         const unsigned int padded_length) {
-        cudaDivideKernel<<<blocks, threadsPerBlock, padded_length>>>(out_data, max_abs_val, padded_length);
+        cudaDivideKernel<<<blocks, threadsPerBlock>>>(out_data, max_abs_val, padded_length);
     /* TODO 2: Call the division kernel. */
 }

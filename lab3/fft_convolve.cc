@@ -177,7 +177,7 @@ int large_gauss_test(int argc, char **argv){
     parameter to control how many trials we run. */
 
     int nChannels = 2;      // Can set as the number of trials
-    int N = 1e7;        // Can set how many data points arbitrarily
+    int N = 1e6;        // Can set how many data points arbitrarily
     int impulse_length = GAUSSIAN_SIZE;
 
 #endif
@@ -415,7 +415,7 @@ int large_gauss_test(int argc, char **argv){
         */
         cudaMemset((void*)(dev_input_data + N), 0x0, sizeof(cufftComplex)*(padded_length - N));
         cudaMemset((void*)(dev_impulse_v + impulse_length), 0x0, sizeof(cufftComplex)*(padded_length - impulse_length));
-
+        cudaMemset((void*)(dev_out_data), 0x0, sizeof(cufftComplex)*padded_length);
 
         /* TODO: Create a cuFFT plan for the forward and inverse transforms. 
         (You can use the same plan for both, as is done in the lecture examples.)
