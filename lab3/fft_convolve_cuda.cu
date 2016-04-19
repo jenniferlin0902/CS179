@@ -79,6 +79,9 @@ __device__ void warpMax(volatile float* sdata, int tid){
     atomicMax((float*)&sdata[tid], sdata[tid + 1]);
 }
 
+__device__ float getMag(cufftComplex num){
+    return num.x*num.x + num.y*num.y;
+}
 __global__
 void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
     int padded_length) {
@@ -105,15 +108,17 @@ void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
         compare-float-in-cuda)
     */
     extern __shared__ float s_max_data[];
+
     //extern __shared__ cufftComplex max_data[];
     uint threadId = threadIdx.x;
 
     while(threadId < padded_length){
-        uint i = blockIdx.x * (blockDim.x * 2)+ threadIdx.x;
-        atomicComplexMax(&out_data[i],out_data[i + blockDim.x]);
+        uint i = blockIdx.x * (blockDim.x)+ threadIdx.x;
+        s_max_data[i] =getMag(out_data[i]);
+        //atomicMax(&s_max_data[i],getMag(out_data[i + blockDim.x]));
         __syncthreads();
 
-        for(unsigned int s = blockDim.x/2; s > 32; s >>= 1){
+        for(unsigned int s = blockDim.x; s > 32; s >>= 1){
             if (threadId < s){
                 atomicMax((float *)s_max_data + threadId, s_max_data[threadId + s]);
             }
