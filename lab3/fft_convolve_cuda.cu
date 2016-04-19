@@ -105,13 +105,24 @@ void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
         compare-float-in-cuda)
     */
 
-    extern __shared__ float s_max_data[];
+    __shared__ float s_max_data[1024];
 
     uint threadId = threadIdx.x;
     uint i = blockIdx.x * (blockDim.x * 2)+ threadIdx.x;
     //printf("padded_length = %d\n", padded_length);
-    while((i + blockDim.x) < padded_length){
-        s_max_data[threadId] = complexCompare(out_data[i], out_data[i + blockDim.x]);
+    float current_max =abs(out_data[i].x);
+    //float step = ;
+    while(i < padded_length){
+       // uint step = blockDim.x;
+        float temp_max = abs(out_data[i].x);
+        if ((i + blockDim.x) < padded_length){
+                float temp2 = abs(out_data[i + blockDim.x].x);
+                temp_max = (temp_max > temp2) ? temp_max:temp2;
+        }
+        current_max = (current_max > temp_max ) ? current_max : temp_max;
+        i += (blockDim.x * 2) * gridDim.x;
+    }
+    s_max_data[threadId] = current_max;
         __syncthreads();
         //printf("first copy\n");
         for(unsigned int s = blockDim.x/2; s > 0; s >>= 1){
@@ -139,8 +150,6 @@ void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
         if (threadId == 0){
             atomicMax(max_abs_val, s_max_data[0]);
         }
-        i += (blockDim.x * 2) * gridDim.x;
-    }
 }
 
 __global__
@@ -173,7 +182,7 @@ void cudaCallMaximumKernel(const unsigned int blocks,
         cufftComplex *out_data,
         float *max_abs_val,
         const unsigned int padded_length) {
-        cudaMaximumKernel<<<blocks, threadsPerBlock, sizeof(float)*threadsPerBlock>>>(out_data, max_abs_val, padded_length);
+        cudaMaximumKernel<<<blocks, threadsPerBlock>>>(out_data, max_abs_val, padded_length);
     /* TODO 2: Call the max-finding kernel. */
 
 }
