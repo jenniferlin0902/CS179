@@ -87,19 +87,20 @@ void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
 
     uint threadId = threadIdx.x;
     uint i = blockIdx.x * (blockDim.x * 2)+ threadIdx.x;
-    while((i + blockDim.x) < padded_length){
+    while((i + blockDim.x) < padded_length) {
         s_max_data[threadId] = complexCompare(out_data[i], out_data[i + blockDim.x]);
         __syncthreads();
-        for(unsigned int s = blockDim.x/2; s > 0; s >>= 1){
-            if (threadId < s){
+        for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
+            if (threadId < s) {
                 s_max_data[threadId] = (s_max_data[threadId] >= s_max_data[threadId + s])\
-                        ? s_max_data[threadId] : s_max_data[threadId + s];
+ ? s_max_data[threadId] : s_max_data[threadId + s];
                 __syncthreads();
             }
         }
-        if (threadId == 0){
+        if (threadId == 0) {
             atomicMax(max_abs_val, s_max_data[0]);
         }
+    }
 }
 
 /**
@@ -109,8 +110,7 @@ void cudaMaximumKernel(cufftComplex *out_data, float *max_abs_val,
  * memory read/write is coalesced.
  */
 __global__
-void
-cudaDivideKernel(cufftComplex *out_data, float *max_abs_val,
+void cudaDivideKernel(cufftComplex *out_data, float *max_abs_val,
     int padded_length) {
     uint thread_index = blockIdx.x * blockDim.x + threadIdx.x;
     float max = *max_abs_val;
