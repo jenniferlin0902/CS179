@@ -71,9 +71,6 @@ __device__ float complexCompare(cufftComplex num1, cufftComplex num2){
  * In each, each thread access the shared memory sequentially. Thus,
  * thre is no bank conflict. In addition, note that the thread is used
  * sequentially as well.
- * When the reduction reach below 32 threads, I unroll the for loop. Since
- * all threads in a warp is syncronize, we don't need to sync threads between
- * each step.
  * The reduction will find the local maximum within a block. Every block will
  * perform atomic compare and swap on the global variable max_abs_val to get the
  * global max.

@@ -16,10 +16,14 @@ Modified by Jordan Bonilla and Matthew Cedeno (2016)
 #include <stdio.h>
 #include <cufft.h>
 #include <time.h>
+#include <math.h>
 #include "ta_utilities.hpp"
 
 #define PI 3.14159265358979
 
+
+/* texture reference declaration */
+texture<float, cudaTextureType1D, cudaReadModeElementType> sinogramTextureRef;
 
 /* Check errors on CUDA runtime functions */
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -56,40 +60,91 @@ void checkCUDAKernelError()
 
 
 __global__
-void cudaHighPassFilterKernal(float *sinogram_input, uint sinogram_width){
-    float step = 1/sinogram_width;
+void cudaHighPassFilterKernal(cufftComplex *sinogram_input, uint sinogram_width, uint nAngles){
+    float step = 2.0/(float)sinogram_width;
     uint threadId = blockIdx.x * blockDim.x + threadIdx.x;
-    while (threadId < sinogram_width){
-        sinogram_input[threadId] = sinogram_input[threadId] * (threadId * step);
+    while (threadId < (sinogram_width*nAngles)){
+        float scale = 2.0 - step * (float)(threadId % sinogram_width);
+        scale = (scale > 1) ? 2.0 - scale : scale;
+        sinogram_input[threadId].x = sinogram_input[threadId].x * scale;
+        sinogram_input[threadId].y = sinogram_input[threadId].y * scale;
         threadId += blockDim.x * gridDim.x;
     }
 }
 
 __global__
-void cudaComplex2FloatKernal(cufftComplex* sinogram_complex, float* sinogram_float, uint sinogram_width){
+void cudaComplex2FloatKernal(cufftComplex* sinogram_complex, float* sinogram_float, uint size){
     uint threadId = blockIdx.x * blockDim.x + threadIdx.x;
-    while (threadId < sinogram_width){
+    while (threadId < size){
         sinogram_float[threadId] = sinogram_complex[threadId].x;
         threadId += blockDim.x * gridDim.x;
     }
 }
 
 
+__global__
+void cudaXrayReconstruction(float* sinogram_input,float* output, uint nAngles, uint sinogram_width, uint height, uint width){
+    uint threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    while (threadId < height * width){
+        int y = -(threadId / width - height/2);
+        int x = threadId % width - width/2;
+        for (uint angle = 0; angle < nAngles; angle++){
+            float theta = angle*PI/nAngles;
 
-void cudalCallHighPassFilterKernal(const unsigned int blocks,
-                                   const unsigned int threadsPerBlock,
-                                   float* sinogram_input,
-                                   uint sinogram_width){
-    cudaHighPassFilterKernal<<<blocks, threadsPerBlock>>>(sinogram_input, sinogram_width);
+            int d;
+            float q, x_i, y_i, m;
+
+            if (theta == 0){
+                d = x;
+            }else if (theta == PI/2){
+                d = y;
+            }else{
+                m = -1.0 * cos(theta)/sin(theta);
+                q = -1.0/m;
+                x_i = ((float)y - m * (float)x)/(float)(q - m);
+                y_i = q*x_i;
+                d = (int)(sqrt(x_i * x_i + y_i * y_i) + 0.5);
+
+                if (((q > 0) && (x_i < 0)) || ((q < 0) && (x_i > 0))){
+                    d = -d;
+                }
+            }
+            uint abs_d = (d < 0) ? -d : d;
+            if (abs_d < sinogram_width/2){
+                output[threadId] += sinogram_input[angle*sinogram_width + sinogram_width/2 + d];
+            }
+        }
+        threadId += blockDim.x * gridDim.x;
+    }
 }
+
+void cudaCallXrayReconstruction(const unsigned int blocks,
+                                const unsigned int threadsPerBlock,
+                                float* sinogram_input,
+                                float* output,
+                                uint nAngles,
+                                uint sinogram_width,
+                                uint height,
+                                uint width){
+    cudaXrayReconstruction<<<blocks, threadsPerBlock>>>(sinogram_input, output, nAngles, sinogram_width, height, width);
+}
+
+void cudaCallHighPassFilterKernal(const unsigned int blocks,
+                                   const unsigned int threadsPerBlock,
+                                   cufftComplex* sinogram_input,
+                                   uint sinogram_width,
+                                    uint nAngles){
+    cudaHighPassFilterKernal<<<blocks, threadsPerBlock>>>(sinogram_input, sinogram_width, nAngles);
+}
+
 
 
 void cudaCallComplex2FloatKernal(const unsigned int blocks,
                                 const unsigned int threadsPerBlock,
                                 cufftComplex* sinogram_complex,
                                 float* sinogram_float,
-                                uint sinogram_width){
-    cudaComplex2FloatKernal<<<blocks, threadsPerBlock>>>(sinogram_complex, sinogram_float, sinogram_width);
+                                uint size){
+    cudaComplex2FloatKernal<<<blocks, threadsPerBlock>>>(sinogram_complex, sinogram_float, size);
 }
 
 int main(int argc, char** argv){
@@ -201,38 +256,22 @@ int main(int argc, char** argv){
     */
 
     cufftHandle plan1;
-    cufftHandle plan2;
-    int batch = 1;
-    cufftPlan1d(&plan, sinogram_width, CUFFT_C2R, batch);
-    for (int n = 0; n < nAngles; n++){
-        cufftExecC2R(plan1, dev_sinogram_cmplx + n * sinogram_width, dev_sinogram_float + n * sinogram_width);
-        cudaCallHighPassFilterKernal(nBlocks, threadsPerBlock, dev_sinogram_float + n * sinogram_width,
-                                     sinogram_width);
-        // Check for errors on kernel call
-        cudaError err = cudaGetLastError();
-        if  (cudaSuccess != err){
-            cerr << "Error " << cudaGetErrorString(err) << endl;
-        } else {
-            cerr << "No kernel error detected" << endl;
-        }
 
-        cufftExecR2C(plan2, dev_sinogram_float + n * sinogram_width, dev_sinogram_cmplx + n * sinogram_width);
+    int batch = nAngles;
+    cufftPlan1d(&plan1, sinogram_width, CUFFT_C2C, batch);
+    //cufftPlan1d(&plan2, sinogram_width, CUFFT_R2C, batch);
+    cufftExecC2C(plan1, dev_sinogram_cmplx, dev_sinogram_cmplx, CUFFT_FORWARD);
+    cudaCallHighPassFilterKernal(nBlocks, threadsPerBlock, dev_sinogram_cmplx,sinogram_width, nAngles);
+    checkCUDAKernelError();
+    cufftExecC2C(plan1, dev_sinogram_cmplx, dev_sinogram_cmplx, CUFFT_INVERSE);
+    cudaCallComplex2FloatKernal(nBlocks, threadsPerBlock, dev_sinogram_cmplx, dev_sinogram_float, sinogram_width*nAngles);
+    checkCUDAKernelError();
 
-        cufftCallComplex2FloatKernal(nBlocks, threadsPerBlock, dev_sinogram_cmplx + n * sinogram_width,
-        dev_sinogram_float + n * sinogram_width , sinogram_width);
-
-        err = cudaGetLastError();
-        if  (cudaSuccess != err){
-            cerr << "Error " << cudaGetErrorString(err) << endl;
-        } else {
-            cerr << "No kernel error detected" << endl;
-        }
-    }
 
 
     cufftDestroy(plan1);
-    cufftDestroy(plan2);
-    cufftFree(dev_sinogram_cmplx);
+ //   cufftDestroy(plan2);
+    cudaFree(dev_sinogram_cmplx);
 
 
 
@@ -242,6 +281,22 @@ int main(int argc, char** argv){
         - Copy the reconstructed image back to output_host.
         - Free all remaining memory on the GPU.
     */
+    /*
+    cudaArray* cArraySinogram;
+
+    textureReference* texRefPtr;
+    cudaGetTextureReference(&texRefPtf, &sinogramTextureRef);
+    cudaChannelFormatDesc channelDesc;
+    channelDesc= cudaCreateChannelDesc<float>();
+
+    cudaBindTexture(0, texRefPtr, dev_sinogram_float, &channelDesc, sinogram_width * nAngles * sizeof(float));
+
+    */
+    cudaCallXrayReconstruction(nBlocks, threadsPerBlock, dev_sinogram_float, output_dev,nAngles, sinogram_width,height, width);
+    checkCUDAKernelError();
+    cudaMemcpy(output_host, output_dev, size_result, cudaMemcpyDeviceToHost);
+    cudaFree(output_dev);
+
 
 
     /* Export image data. */
