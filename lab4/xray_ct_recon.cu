@@ -23,7 +23,7 @@ Modified by Jordan Bonilla and Matthew Cedeno (2016)
 
 
 /* texture reference declaration */
-texture<float, cudaTextureType1D, cudaReadModeElementType> sinogramTextureRef;
+texture<float, cudaTextureType2D, cudaReadModeElementType> sinogramTextureRef;
 
 /* Check errors on CUDA runtime functions */
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -111,12 +111,19 @@ void cudaXrayReconstruction(float* sinogram_input,float* output, uint nAngles, u
             }
             uint abs_d = (d < 0) ? -d : d;
             if (abs_d < sinogram_width/2){
-                output[threadId] += sinogram_input[angle*sinogram_width + sinogram_width/2 + d];
+                /** uncommented this line to switch to global memory instead of
+                 * texture memory */
+
+                //output[threadId] += sinogram_input[angle*sinogram_width + sinogram_width/2 + d];
+                output[threadId] += tex2D(sinogramTextureRef, (sinogram_width/2 + d) , angle);
             }
         }
         threadId += blockDim.x * gridDim.x;
     }
 }
+
+
+
 
 void cudaCallXrayReconstruction(const unsigned int blocks,
                                 const unsigned int threadsPerBlock,
@@ -234,32 +241,20 @@ int main(int argc, char** argv){
 
     /*********** Assignment starts here *********/
 
-    /* TODO: Allocate memory for all GPU storage above, copy input sinogram
-    over to dev_sinogram_cmplx. */
+
     cudaMalloc(&dev_sinogram_cmplx, sizeof(cufftComplex) * sinogram_width * nAngles);
     cudaMalloc(&dev_sinogram_float, sizeof(float) * sinogram_width *nAngles);
     cudaMalloc(&output_dev, size_result);
     cudaMemcpy(dev_sinogram_cmplx, sinogram_host, sizeof(cufftComplex) * sinogram_width * nAngles, cudaMemcpyHostToDevice);
-    //cudaMemcpy(dev_sinogram_float, sino)
+
     cudaMemset(dev_sinogram_float, 0x0, sizeof(float) * sinogram_width * nAngles);
     cudaMemset(output_dev, 0x0, size_result);
 
-    /* TODO 1: Implement the high-pass filter:
-        - Use cuFFT for the forward FFT
-        - Create your own kernel for the frequency scaling.
-        - Use cuFFT for the inverse FFT
-        - extract real components to floats
-        - Free the original sinogram (dev_sinogram_cmplx)
 
-        Note: If you want to deal with real-to-complex and complex-to-real
-        transforms in cuFFT, you'll have to slightly change our code above.
-    */
-
+    // Perfrom FFT and HPF
     cufftHandle plan1;
-
     int batch = nAngles;
     cufftPlan1d(&plan1, sinogram_width, CUFFT_C2C, batch);
-    //cufftPlan1d(&plan2, sinogram_width, CUFFT_R2C, batch);
     cufftExecC2C(plan1, dev_sinogram_cmplx, dev_sinogram_cmplx, CUFFT_FORWARD);
     cudaCallHighPassFilterKernal(nBlocks, threadsPerBlock, dev_sinogram_cmplx,sinogram_width, nAngles);
     checkCUDAKernelError();
@@ -270,32 +265,31 @@ int main(int argc, char** argv){
 
 
     cufftDestroy(plan1);
- //   cufftDestroy(plan2);
     cudaFree(dev_sinogram_cmplx);
 
 
-
-    /* TODO 2: Implement backprojection.
-        - Allocate memory for the output image.
-        - Create your own kernel to accelerate backprojection.
-        - Copy the reconstructed image back to output_host.
-        - Free all remaining memory on the GPU.
-    */
-    /*
+    // Allocate cuda array to bind to texture memory
     cudaArray* cArraySinogram;
-
-    textureReference* texRefPtr;
-    cudaGetTextureReference(&texRefPtf, &sinogramTextureRef);
     cudaChannelFormatDesc channelDesc;
-    channelDesc= cudaCreateChannelDesc<float>();
+    channelDesc = cudaCreateChannelDesc<float>();
+    // copy sinogram_float to cuda array cArraySinogram
+    cudaMallocArray(&cArraySinogram, &channelDesc, sinogram_width, nAngles);
+    cudaMemcpyToArray(cArraySinogram,0,0, dev_sinogram_float, sinogram_width * nAngles * sizeof(float), cudaMemcpyDeviceToDevice);
+    sinogramTextureRef.normalized = 0;
+    sinogramTextureRef.filterMode=cudaFilterModePoint;
+    sinogramTextureRef.addressMode[0] = cudaAddressModeWrap;
+    sinogramTextureRef.addressMode[1] = cudaAddressModeClamp;
+    cudaBindTextureToArray(sinogramTextureRef, cArraySinogram);
 
-    cudaBindTexture(0, texRefPtr, dev_sinogram_float, &channelDesc, sinogram_width * nAngles * sizeof(float));
 
-    */
+
     cudaCallXrayReconstruction(nBlocks, threadsPerBlock, dev_sinogram_float, output_dev,nAngles, sinogram_width,height, width);
     checkCUDAKernelError();
+
     cudaMemcpy(output_host, output_dev, size_result, cudaMemcpyDeviceToHost);
+    cudaUnbindTexture(sinogramTextureRef);
     cudaFree(output_dev);
+    cudaFreeArray(cArraySinogram);
 
 
 
