@@ -18,6 +18,8 @@
  *         value of loss function over the batch or the misclassification rate
  *         in the batch to errors.
  */
+
+
 __global__
 void trainLogRegKernel(
     float *data,
@@ -26,49 +28,65 @@ void trainLogRegKernel(
 	float *weights,
     float *errors)
 {
+
     __shared__ float grad[REVIEW_DIM];
-    __shared__ float err_count = 0;
-
-
+    //float* grad = shared;
+    float temp;
+    float* err_count = &temp;
+    // float* err_count = (float*)(grad + REVIEW_DIM);
     int x_dim = REVIEW_DIM + 1;
     int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (threadId == 0){
-        memset(grad, 0x0, sizeof(float) * REVIEW_DIM);
 
+    if (threadId < REVIEW_DIM){
+        grad[threadId] = 0.0;
+        //printf("data = %f\n", data[threadId*x_dim + 50]);
     }
-
-    while (threadId < batch_size){
-        float y = data[threadId * x_dim + 50];
-        for (int i = 0; i < REVIEW_DIM; i++){
-            float x = data[threadId * x_dim + i];
-            float sub_grad =  x * y / (1 + exp(y * weights[threadId] * x));
-            atomicAdd(grad[i], sub_grad);
-        }
-        threadId += blockDim.x * gridDim.x;
+    if (threadId == 0){
+        *err_count = 0;
+        printf("err_cout = %f\n", *err_count);
     }
     __syncthreads();
-    if (threadId < REVIEW_DIM){
-        atomicAdd(weights[threadId], -1*grad[1] * step_size);
-    }
-
     while (threadId < batch_size){
         float y = data[threadId * x_dim + 50];
+
+        for (int i = 0; i < REVIEW_DIM; i++){
+            float x = data[threadId * x_dim + i];
+            //printf("x = %f\n", x);
+            float sub_grad =  x * y / (1 + exp(y * weights[threadId] * x));
+            atomicAdd(&(grad[i]), sub_grad);
+
+        }
+        threadId += blockDim.x * gridDim.x;
+        printf("grad = %f\n", grad[1]);
+    }
+    __syncthreads();
+    threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    if (threadId == 0){
+        for (int i = 0; i < REVIEW_DIM; i++){
+           // weights[i] -= step_size * grad[i]/batch_size;
+        }
+    }
+
+/*
+    while (threadId < batch_size){
         float est_y = 0;
         for (int i = 0; i < REVIEW_DIM; i++){
-            float x = data[threadId * x_dim + i];
-            float w = weight[i];
-            est_y += x * w;
+            est_y +=  data[threadId * x_dim + i]* weights[i];
         }
-        if (est_y * y <=0 ){
+        printf("est_y = %f\n", est_y);
+        if (est_y * data[threadId * x_dim + 50] <= 0 ){
             atomicAdd(err_count, 1);
+            //printf("here\n");
         }
         threadId += blockDim.x * gridDim.x;
     }
+*/
     __syncthreads();
-    if (threadId == 0){
-        errors = err_count/batch_size;
-    }
+    threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    //if (threadId == 0){
+        //int temp = *err_count/batch_size;
+        *errors = 1.0;
 
 }
 
@@ -89,6 +107,8 @@ float cudaClassify(
     // grid_size = CEIL(batch_size / block_size)
     int grid_size = (batch_size + block_size - 1) / block_size;
     int shmem_bytes = 0;
+
+
 
     float *d_errors;
     cudaMalloc(&d_errors, sizeof(float));
