@@ -132,24 +132,23 @@ void classify(istream& in_stream, int batch_size) {
 
     int first_batch = 1;
     for (string review_str; getline(in_stream, review_str); review_idx++) {
+        // Read data from file until we fill up a batch
         readLSAReview(review_str, (host_inputs[buffer_num]) + batch_count * (REVIEW_DIM + 1), 1);
 
         batch_count++;
         if (batch_count == batch_size){
-
+            // syncronize previous buffer to make sure that the previous kernal is completed
             cudaStreamSynchronize(s[buffer_num]);
+            // copy the new batch to device
             cudaMemcpyAsync(dev_inputs[buffer_num], host_inputs[buffer_num], sizeof(float)*(REVIEW_DIM + 1) * batch_size,
                             cudaMemcpyHostToDevice,s[buffer_num]);
 
-           // checkCUDAKernelError();
             if (!first_batch){
+                // run kernal on the previous data that was copied to device
                 cudaClassify(dev_inputs[prev_buffer_num], batch_size, step_size, dev_weight,s[prev_buffer_num]);
-                //checkCUDAKernelError();
             }
-            first_batch = 0;
 
-            //checkCUDAKernelError();
-            //gpuErrChk();
+            first_batch = 0;
             prev_buffer_num = buffer_num;
             buffer_num = (buffer_num + 1) % 2;
             batch_count = 0;
@@ -158,23 +157,25 @@ void classify(istream& in_stream, int batch_size) {
            // printf("batch %d, err = %f \n",batch_num, err);
         }
     }
+
     cudaStreamSynchronize(s[buffer_num]);
+    // need to run the last batch
     cudaClassify(dev_inputs[prev_buffer_num], batch_size, step_size, dev_weight, s[prev_buffer_num]);
     cudaStreamSynchronize(s[prev_buffer_num]);
 
 
     cudaMemcpy(host_weight, dev_weight, sizeof(float) * REVIEW_DIM, cudaMemcpyDeviceToHost);
 
-
+    printf("final weight : \n");
     for (int i = 0; i < REVIEW_DIM; i++){
-        printf("%f ", host_weight[i]);
+        printf("%f \n", host_weight[i]);
     }
 
-    // TODO: print out weights
-    // TODO: free all memory
     cudaFree(dev_weight);
     cudaFree(dev_inputs[1]);
     cudaFree(dev_inputs[0]);
+    free(host_inputs[0]);
+    free(host_inputs[1]);
 }
 
 int main(int argc, char** argv) {
