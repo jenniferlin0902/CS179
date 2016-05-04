@@ -70,6 +70,13 @@ cudaEvent_t stop;
 ////////////////////////////////////////////////////////////////////////////////
 // Start non boilerplate code
 
+/*
+void CUDART_CB CheckOutputCallback(cudaStream_t stream, cudaError_t status, void *data){
+    printf("Inside callback %d\n", (size_t)data);
+}
+*/
+
+
 // Fills output with standard normal data
 void gaussianFill(float *output, int size) {
     // seed generator to 2015
@@ -93,13 +100,10 @@ void readLSAReview(string review_str, float *output, int stride) {
 }
 
 void classify(istream& in_stream, int batch_size) {
-    // TODO: randomly initialize weights. allocate and initialize buffers on
-    //       host & device. allocate and initialize streams
+
     float* host_weight;
     float* dev_weight;
-    float step_size = 1.0;
-    //float* host_output1;
-    //float* host_output2;
+    int step_size = 1;
     float* host_inputs[2];
     float* dev_inputs[2];
 
@@ -114,7 +118,6 @@ void classify(istream& in_stream, int batch_size) {
     cudaMalloc(&(dev_inputs[0]), sizeof(float) * (REVIEW_DIM + 1) * batch_size);
     cudaMemcpy(dev_weight, host_weight, sizeof(float) * REVIEW_DIM, cudaMemcpyHostToDevice);
     checkCUDAKernelError();
-    // main loop to process input lines (each line corresponds to a review)
     cudaStream_t s[2];
     cudaStreamCreate(&s[0]);
     cudaStreamCreate(&s[1]);
@@ -126,33 +129,39 @@ void classify(istream& in_stream, int batch_size) {
     int buffer_num = 0;
     int prev_buffer_num = 0;
     int batch_num = 0;
-    //int first_batch = 1;
+
+    int first_batch = 1;
     for (string review_str; getline(in_stream, review_str); review_idx++) {
         readLSAReview(review_str, (host_inputs[buffer_num]) + batch_count * (REVIEW_DIM + 1), 1);
+
         batch_count++;
         if (batch_count == batch_size){
-            /*
-            for (int i = 0; i < batch_size; i++){
-                printf("bufferdata = %f\n", *(host_inputs[buffer_num]+i * (REVIEW_DIM + 1) + 50));
-            }*/
+
+            cudaStreamSynchronize(s[buffer_num]);
             cudaMemcpyAsync(dev_inputs[buffer_num], host_inputs[buffer_num], sizeof(float)*(REVIEW_DIM + 1) * batch_size,
                             cudaMemcpyHostToDevice,s[buffer_num]);
 
            // checkCUDAKernelError();
-            float err = cudaClassify(dev_inputs[buffer_num], batch_size, step_size, dev_weight, s[buffer_num]);
+            if (!first_batch){
+                cudaClassify(dev_inputs[prev_buffer_num], batch_size, step_size, dev_weight,s[prev_buffer_num]);
+                //checkCUDAKernelError();
+            }
+            first_batch = 0;
 
-            checkCUDAKernelError();
+            //checkCUDAKernelError();
             //gpuErrChk();
             prev_buffer_num = buffer_num;
             buffer_num = (buffer_num + 1) % 2;
             batch_count = 0;
             batch_num++;
-            //printf("batch %d, err = %f \n",batch_num, err);
+            //cudaStreamSynchronize(s[prev_buffer_num]);
+           // printf("batch %d, err = %f \n",batch_num, err);
         }
     }
-    for(int i = 0; i < 2; i++){
-        cudaStreamSynchronize(s[i]);
-    }
+    cudaStreamSynchronize(s[buffer_num]);
+    cudaClassify(dev_inputs[prev_buffer_num], batch_size, step_size, dev_weight, s[prev_buffer_num]);
+    cudaStreamSynchronize(s[prev_buffer_num]);
+
 
     cudaMemcpy(host_weight, dev_weight, sizeof(float) * REVIEW_DIM, cudaMemcpyDeviceToHost);
 
@@ -185,7 +194,7 @@ int main(int argc, char** argv) {
     // Init timing
 	float time_initial, time_final;
 	
-    int batch_size = 2048;
+    int batch_size = 16384;
 	
 	// begin timer
 	time_initial = clock();

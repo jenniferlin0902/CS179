@@ -6,8 +6,8 @@
 float cudaClassify(
     float *data,
     int batch_size, 
-    float step_size,
-    float *weights, 
+    int step_size,
+    float *weights,
     cudaStream_t stream);
 
 #endif
