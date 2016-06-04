@@ -35,29 +35,28 @@ else
       NVCCFLAGS := -m64
 endif
 
-TARGETS = deconvolution
+TARGETS = image_deblur
+OBJS = deconvolution.o main.o matrix_utility.o cuda_matrix_utility_c.o cuda_matrix_utility.o
 
-all: $(deconvolution)
+all: $(TARGETS)
 
-deconvolution: main.o deconvolution.o matrix_utility.o cuda_matrix_utility_c.o cuda_matrix_utility.o
-	$(CC) $< -o -O3 $(LDFLAGS) -Wall -I$(CUDA_INC_PATH) -fopenmp
+image_deblur: $(OBJS)
+	$(CC) -o image_deblur $(OBJS) $(LDFLAGS)
 
 main.o: main.cpp
-	$(CC) -std=c++11 -O3 $(LDFLAGS) -Wall -I$(CUDA_INC_PATH) -o $@ -c $<
+	$(CC) $(CCFLAGS) -std=c++11 -O3 $(LDFLAGS) -Wall -I$(CUDA_INC_PATH) -o $@ -c $<
 
 deconvolution.o: deconvolution.cpp
-	$(CC) -std=c++11 -O3 $(LDFLAGS) -Wall -I$(CUDA_INC_PATH) -o $@ -c $<
+	$(CC) $(CCFLAGS) -std=c++11 -O3 $(LDFLAGS) -Wall -I$(CUDA_INC_PATH) -o $@ -c $<
 
 matrix_utility.o: matrix_utility.cpp
-	$(CC) -std=c++11 -O3 $(LDFLAGS) -Wall -I$(CUDA_INC_PATH) -o $@ -c $<
+	$(CC) $(CCFLAGS) -std=c++11 -O3 $(LDFLAGS) -Wall -I$(CUDA_INC_PATH) -o $@ -c $<
 
 cuda_matrix_utility_c.o: cuda_matrix_utility.cpp
-	$(CC) -std=c++11 -O3 $(LDFLAGS) -Wall -I$(CUDA_INC_PATH) -o $@ -c $<
+	$(CC) $(CCFLAGS) -std=c++11 -O3 $(LDFLAGS) -Wall -I$(CUDA_INC_PATH) -o $@ -c $<
 
 cuda_matrix_utility.o: cuda_matrix_utility.cu
 	$(NVCC) $(NVCCFLAGS) -O3 $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) -I$(CUDA_INC_PATH) -o $@ -c $<
-
-
 
 
 clean:

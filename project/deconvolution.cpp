@@ -5,19 +5,21 @@
 #include "cuda_matrix_utility.h"
 #include <stdlib.h>
 #include <math.h>
+#include <limits>
 #include <iostream>
+#include <cuda_runtime.h>
 
 const int FIR_P = 3;
 
 
 
 void FIR_normalization(float* FIR, int size){
-    int sum = 0;
+    double sum = 0;
     for (int i = 0; i < size; i++){
         sum+=FIR[i];
     }
     for (int i =0; i < size; i++){
-        FIR[i] = FIR[i] / (float)sum;
+        FIR[i] = FIR[i] / (int)sum;
     }
 }
 
@@ -30,7 +32,6 @@ void init_Weiner(float* FIR, int size){
 
 
 void weiner_Rxy(float* x, float* y, float* Rxy, dim_t x_dim, dim_t f_dim){
-    //float* Ry = new float[size];
     int size = x_dim.w * x_dim.h;
     for(int n = 0; n < f_dim.w * f_dim.h; n++){
         Rxy[n] = 0.0;
@@ -45,11 +46,11 @@ void weiner_Rxy(float* x, float* y, float* Rxy, dim_t x_dim, dim_t f_dim){
     }
 }
 
-void weiner_update(float* FIR, float* est, float* y, float* Ryy, dim_t x_dim, dim_t FIR_dim){
+
+void weiner_update_cpu(float* FIR, float* est, float* y, float* Ryy, dim_t x_dim, dim_t FIR_dim){
     int size = FIR_dim.w * FIR_dim.h;
     int P = (FIR_dim.w - 1)/2;
     float* Rxy = new float[size];
-    //float* Ryy = new float[1];
     weiner_Rxy(est, y, Rxy, x_dim, FIR_dim);
 
     for(int i = 0; i < size; i++){
@@ -70,41 +71,86 @@ void weiner_update(float* FIR, float* est, float* y, float* Ryy, dim_t x_dim, di
     delete Rxy;
 }
 
+
 float MMSE_estimation(float est, float noise_var){
     float estimator;
     const float a = 255;
     const float p0 = 0.5;
+    // logistic function between 0 to 255
     estimator = a / (1 + expf(-0.04*(est - 255/2)));
-/*
-    if (est < 255/2){
-        estimator = 1;
-    //}else if (est > 200){
-      //  estimator = 255;
-    }else{
-        estimator = 255;
-    }*/
-
     return estimator;
 }
 
-void run_deconvolution(float* input, float* output, dim_t input_dim, int max_steps){
+void run_deconvolution_gpu(float* input, float* output, dim_t input_dim, int max_steps){
+    dim_t FIR_dim = {2*FIR_P+1,2*FIR_P+1 };
+    float* weiner_FIR = new float[FIR_dim.w * FIR_dim.h];
+    float* dev_f;
+    float* dev_input;
+    float* dev_result;
+    float* dev_Ryy;
+
+    int size_x = input_dim.w * input_dim.h;
+    int size_f = FIR_dim.w * FIR_dim.h;
+    // initailize fileter in CPU side
+    init_Weiner(weiner_FIR, (FIR_P*2+1)*(FIR_P*2+1));
+
+    // allocate and initialize dev variables
+    cudaMalloc(&dev_f, sizeof(float) * size_f);
+    cudaMalloc(&dev_input, sizeof(float) * size_x);
+    cudaMalloc(&dev_result, sizeof(float) * size_x);
+    cudaMalloc(&dev_Ryy, sizeof(float)*size_f);
+
+    cudaMemset(dev_Ryy, 0x0, sizeof(float)* size_f);
+    cudaMemcpy(dev_f, weiner_FIR, sizeof(float) * size_f, cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_input, input, sizeof(float) * size_x, cudaMemcpyHostToDevice);
+    cudaMemset(dev_result, 0x0, sizeof(float) * size_x);
+
+    cuda_matrix_utility::weiner_Rxy(dev_input, dev_input,dev_Ryy, input_dim, FIR_dim);
+
+    for(int i = 0; i < max_steps; i++){
+        // apply linear filter
+        cuda_matrix_utility::convolve2D(dev_f, dev_input, dev_result, input_dim, FIR_dim);
+
+        // estimate filter result
+        cuda_matrix_utility::MMSE_estimation(dev_result, input_dim.w * input_dim.h);
+        // updat fileter
+        cuda_matrix_utility::weiner_update(dev_f,dev_result, dev_input, dev_Ryy, input_dim, FIR_dim);
+    }
+
+    cudaMemcpy(output, dev_result, sizeof(float)*size_x, cudaMemcpyDeviceToHost);
+    cudaFree(dev_result);
+    cudaFree(dev_input);
+    cudaFree(dev_f);
+    cudaFree(dev_Ryy);
+
+    std::cout<<"done GPU deconvolution" << std::endl;
+    delete weiner_FIR;
+}
+
+
+void run_deconvolution_cpu(float* input, float* output, dim_t input_dim, int max_steps){
     dim_t FIR_dim = {2*FIR_P+1,2*FIR_P+1 };
     float* weiner_FIR = new float[FIR_dim.w * FIR_dim.h];
     float* Ryy = new float[FIR_dim.w * FIR_dim.h];
+
+    // initialize weiner filter with random number
     init_Weiner(weiner_FIR, (FIR_P*2+1)*(FIR_P*2+1));
+    // calculate cross correlation for input
     weiner_Rxy(input, input,Ryy, input_dim, FIR_dim);
+
+    // start blind deconvolution step
     for(int i = 0; i < max_steps; i++){
-        // linear estimation step
-        cuda_matrix_utility::convolve2D(weiner_FIR, input, output, input_dim, FIR_dim);
-        //nolinear estimatin step
-        //matrix_utility::division(output, input, output, w*h);
-        //float max = 0;
+        // apply filter
+        matrix_utility::convolve2D(weiner_FIR, input, output, input_dim, FIR_dim);
+
+        // estimate the filtered image
         for (int n = 0; n < input_dim.w*input_dim.h; n++){
             output[n] = MMSE_estimation(output[n],0.5);
         }
-        weiner_update(weiner_FIR,output, input, Ryy, input_dim, FIR_dim);
+        // update filter value based on the estimation.
+        weiner_update_cpu(weiner_FIR,output, input, Ryy, input_dim, FIR_dim);
     }
-    std::cout<<"done deconvolution" << std::endl;
+    std::cout<<"done CPU deconvolution" << std::endl;
     delete weiner_FIR;
 }
 

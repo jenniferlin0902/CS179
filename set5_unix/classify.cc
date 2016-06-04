@@ -118,6 +118,7 @@ void classify(istream& in_stream, int batch_size) {
     cudaMalloc(&(dev_inputs[0]), sizeof(float) * (REVIEW_DIM + 1) * batch_size);
     cudaMemcpy(dev_weight, host_weight, sizeof(float) * REVIEW_DIM, cudaMemcpyHostToDevice);
     checkCUDAKernelError();
+
     cudaStream_t s[2];
     cudaStreamCreate(&s[0]);
     cudaStreamCreate(&s[1]);

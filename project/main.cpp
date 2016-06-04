@@ -3,9 +3,23 @@
 #include <algorithm>
 #include "matrix_utility.h"
 #include "deconvolution.h"
-#include <string.h>
-#include <stdio.h>
+#include <cuda_runtime.h>
+#include <algorithm>
+#include <cassert>
+
 using namespace std;
+
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+    if (code != cudaSuccess)
+    {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        exit(code);
+    }
+}
+
 
 int main(int argc, char* argv[]) {
     if (argc != 5){
@@ -38,20 +52,40 @@ int main(int argc, char* argv[]) {
     }
     infile.close();
 
-    // test matrix utility
-    /*
-    float mat[] = {1.0, 2.0, 3.0, 4.0};
-    float det = matrix_utility::det(mat, 2);
-    printf("det = %f \n", det);
-
-    float a[] = {2.0, 4.0, 5.0, -1.0};
-    float* result = new float[4];
-    matrix_utility::convolve(a, mat, result, 4);
-    printf("convolution result = %f %f %f %f\n", result[0],result[1],result[2],result[3]);
-    return 0; */
     float* output = new float[size];
     dim_t input_dim = {w, h};
-    run_deconvolution(input, output, input_dim, steps);
+
+    // use cuda machinary to time
+    cudaEvent_t start;
+    cudaEvent_t stop;
+    float cpu_time_ms = -1;
+    float gpu_time_ms = -1;
+
+#define START_TIMER() {                         \
+      gpuErrchk(cudaEventCreate(&start));       \
+      gpuErrchk(cudaEventCreate(&stop));        \
+      gpuErrchk(cudaEventRecord(start));        \
+    }
+
+#define STOP_RECORD_TIMER(name) {                           \
+      gpuErrchk(cudaEventRecord(stop));                     \
+      gpuErrchk(cudaEventSynchronize(stop));                \
+      gpuErrchk(cudaEventElapsedTime(&name, start, stop));  \
+      gpuErrchk(cudaEventDestroy(start));                   \
+      gpuErrchk(cudaEventDestroy(stop));                    \
+    }
+
+// and start timer
+    START_TIMER();
+    run_deconvolution_cpu(input, output, input_dim, steps);
+    STOP_RECORD_TIMER(cpu_time_ms);
+    printf("CPU deconvolution finish in %f ms\n", cpu_time_ms);
+
+    START_TIMER();
+    run_deconvolution_gpu(input, output, input_dim, steps);
+    STOP_RECORD_TIMER(gpu_time_ms);
+    printf("GPU deconvolution finish in %f ms\n", gpu_time_ms);
+
     std::string filename;
     filename = argv[1];
     std::size_t s = filename.find(".txt");
@@ -59,7 +93,7 @@ int main(int argc, char* argv[]) {
     std::ofstream outfile;
     outfile.open(filename);
     if(outfile.is_open()){
-        for(int i; i<h*w - 1; i++){
+        for(int i = 0; i<h*w - 1; i++){
             outfile<<(int)output[i]<<",";
         }
         outfile<<(int)output[h*w - 1];
